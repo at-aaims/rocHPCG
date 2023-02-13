@@ -99,7 +99,7 @@ endif()
 
 # AMD targets
 foreach(target ${AMDGPU_TARGETS})
-  list(APPEND HIP_HIPCC_FLAGS "--amdgpu-target=${target}")
+  list(APPEND HIP_HIPCC_FLAGS "--offload-arch=${target}")
 endforeach()
 
 # Target executable
@@ -163,6 +163,9 @@ endif()
 # MPI
 if(HPCG_MPI)
   target_link_libraries(rochpcg PRIVATE MPI::MPI_CXX libnuma::libnuma)
+  if(GPU_AWARE_MPI)
+    target_link_libraries(rochpcg PRIVATE ${MPI_GTL_HSA_LIB})
+  endif()
 else()
   target_compile_definitions(rochpcg PRIVATE HPCG_NO_MPI)
 endif()
