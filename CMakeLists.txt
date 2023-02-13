@@ -48,6 +48,7 @@ endif()
 
 # rocHPCG project
 project(rochpcg LANGUAGES CXX)
+#project(rochpcg)
 
 # Force library install path to lib (CentOS 7 defaults to lib64)
 set(CMAKE_INSTALL_LIBDIR "lib" CACHE INTERNAL "Installation directory for libraries" FORCE)

@@ -41,6 +41,8 @@ endif()
 
 # MPI
 set(MPI_HOME ${HPCG_MPI_DIR})
+set(MPI_DIR ${HPCG_MPI_DIR})
+message(STATUS "Looking for MPI in ${HPCG_MPI_DIR}")
 find_package(MPI)
 if (NOT MPI_FOUND)
   message("-- MPI not found. Compiling WITHOUT MPI support.")
@@ -49,6 +51,7 @@ if (NOT MPI_FOUND)
   endif()
 else()
   option(HPCG_MPI "Compile WITH MPI support." ON)
+  message(STATUS "Found MPI CXX headers at ${MPI_CXX_INCLUDE_DIRS}.")
 endif()
 
 # gtest
@@ -59,10 +62,17 @@ endif()
 # libnuma if MPI is enabled
 if(HPCG_MPI)
   find_package(LIBNUMA REQUIRED)
+  find_library(MPI_GTL_HSA_LIB mpi_gtl_hsa PATHS $ENV{CRAY_MPICH_ROOTDIR}/gtl/lib)
+  if("${MPI_GTL_HSA_LIB}" STREQUAL "MPI_GTL_HSA_LIB-NOTFOUND")
+    message(SEND_ERROR "MPI GTL HSA library not found!")
+  else()
+    message(STATUS "GTL found at ${MPI_GTL_HSA_LIB}.")
+  endif()
 endif()
 
 # rocm-cmake
-find_package(ROCM 0.7.3 QUIET CONFIG PATHS ${CMAKE_PREFIX_PATH} $ENV{ROCM_PATH})
+#find_package(ROCM 0.7.3 CONFIG PATHS ${CMAKE_PREFIX_PATH} $ENV{ROCM_PATH})
+find_package(ROCM CONFIG PATHS ${CMAKE_PREFIX_PATH} $ENV{ROCM_PATH})
 if(NOT ROCM_FOUND)
   set(PROJECT_EXTERN_DIR "${CMAKE_CURRENT_BINARY_DIR}/deps")
   file( TO_NATIVE_PATH "${PROJECT_EXTERN_DIR}" PROJECT_EXTERN_DIR_NATIVE)
@@ -105,3 +115,4 @@ include(ROCMPackageConfigHelpers)
 include(ROCMInstallSymlinks)
 include(ROCMCheckTargetIds)
 include(ROCMClients)
+
