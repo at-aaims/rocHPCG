@@ -160,10 +160,9 @@ int main(int argc, char * argv[]) {
 #endif
 #endif
 
-  local_int_t nx,ny,nz;
-  nx = (local_int_t)params.nx;
-  ny = (local_int_t)params.ny;
-  nz = (local_int_t)params.nz;
+  const local_int_t nx = (local_int_t)params.nx;
+  const local_int_t ny = (local_int_t)params.ny;
+  const local_int_t nz = (local_int_t)params.nz;
   int ierr = 0;  // Used to check return codes on function calls
 
   ierr = CheckAspectRatio(0.125, nx, ny, nz, "local problem", rank==0);
