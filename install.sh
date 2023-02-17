@@ -223,6 +223,7 @@ install_package=false
 install_dependencies=false
 install_prefix=rochpcg-install
 build_release=true
+build_debug=false
 build_reference=false
 build_test=false
 with_rocm=/opt/rocm
@@ -240,7 +241,7 @@ with_roctx=false
 # check if we have a modern version of getopt that can handle whitespace and long parameters
 getopt -T
 if [[ $? -eq 4 ]]; then
-  GETOPT_PARSE=$(getopt --name "${0}" --longoptions help,install,dependencies,reference,debug,test,with-rocm:,with-mpi:,gpu-aware-mpi:,with-openmp:,with-memmgmt:,with-memdefrag:,with-roctx --options hidrgt -- "$@")
+  GETOPT_PARSE=$(getopt --name "${0}" --longoptions help,install,dependencies,reference,debug,relwithdebinfo,test,with-rocm:,with-mpi:,gpu-aware-mpi:,with-openmp:,with-memmgmt:,with-memdefrag:,with-roctx --options hidrgt -- "$@")
 else
   echo "Need a new version of getopt"
   exit 1
@@ -270,6 +271,11 @@ while true; do
         shift ;;
     -g|--debug)
         build_release=false
+        build_debug=true
+        shift ;;
+    --relwithdebinfo)
+        build_release=false
+        build_debug=false
         shift ;;
     -t|--test)
         build_test=true
@@ -293,8 +299,8 @@ while true; do
         with_memdefrag=${2}
         shift 2 ;;
     --with-roctx)
-	with_roctx=true
-	shift ;;
+	    with_roctx=true
+	    shift ;;
     --) shift ; break ;;
     *)  echo "Unexpected command line parameter received; aborting";
         exit 1
@@ -311,8 +317,10 @@ printf "\033[32mCreating project build directory in: \033[33m${build_dir}\033[0m
 # ensure a clean build environment
 if [[ "${build_release}" == true ]]; then
   rm -rf ${build_dir}/release
-else
+elif [[ "${build_debug}" == true ]]; then
   rm -rf ${build_dir}/debug
+else
+  rm -rf ${build_dir}/relwithdebinfo
 fi
 
 # Default cmake executable is called cmake
@@ -367,9 +375,12 @@ pushd .
   if [[ "${build_release}" == true ]]; then
     mkdir -p ${build_dir}/release && cd ${build_dir}/release
     cmake_common_options="${cmake_common_options} -DCMAKE_BUILD_TYPE=Release"
-  else
+  elif [[ "${build_debug}" == true ]]; then
     mkdir -p ${build_dir}/debug && cd ${build_dir}/debug
     cmake_common_options="${cmake_common_options} -DCMAKE_BUILD_TYPE=Debug"
+  else
+    mkdir -p ${build_dir}/relwithdebinfo && cd ${build_dir}/relwithdebinfo
+    cmake_common_options="${cmake_common_options} -DCMAKE_BUILD_TYPE=RelWithDebInfo"
   fi
 
   # reference mode

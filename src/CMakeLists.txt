@@ -93,8 +93,12 @@ list(APPEND HIP_HIPCC_FLAGS "-std=c++14 -O3 -march=native -Wno-unused-command-li
 list(APPEND CMAKE_HOST_FLAGS "-O3;-march=native")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-list(APPEND HIP_HIPCC_FLAGS "-g")
-list(APPEND CMAKE_HOST_FLAGS "-g")
+  list(APPEND HIP_HIPCC_FLAGS "-g")
+  list(APPEND CMAKE_HOST_FLAGS "-g")
+endif()
+
+if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+  list(APPEND CMAKE_HOST_FLAGS "-g")
 endif()
 
 # AMD targets
@@ -109,7 +113,8 @@ else()
   hip_add_executable(rochpcg ${rochpcg_source} main.cpp ${rochpcg_hip_source})
 endif()
 
-target_compile_options(rochpcg PRIVATE ${CMAKE_HOST_FLAGS})
+#target_compile_options(rochpcg PRIVATE ${CMAKE_HOST_FLAGS})
+target_compile_options(rochpcg PRIVATE "-march=native")
 
 # Support only for contiguous arrays
 target_compile_definitions(rochpcg PRIVATE HPCG_CONTIGUOUS_ARRAYS)
