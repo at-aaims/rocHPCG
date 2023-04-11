@@ -154,7 +154,8 @@ endif()
 target_include_directories(rochpcg
                              PRIVATE
                                $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
-                               $<BUILD_INTERFACE:${HIP_INCLUDE_DIRS}>)
+                               $<BUILD_INTERFACE:${HIP_INCLUDE_DIRS}>
+                               ${MPI_CXX_INCLUDE_DIRS})
 
 # HIP
 target_link_libraries(rochpcg PRIVATE hip::host)
@@ -178,6 +179,8 @@ endif()
 # OpenMP
 if(HPCG_OPENMP)
   target_link_libraries(rochpcg PRIVATE OpenMP::OpenMP_CXX)
+  target_link_libraries(rochpcg PRIVATE ${OpenMP_CXX_LIBRARIES})
+  target_link_options(rochpcg PRIVATE "-fopenmp")
 else()
   target_compile_definitions(rochpcg PRIVATE HPCG_NO_OPENMP)
 endif()

@@ -63,6 +63,7 @@ option(HPCG_DEBUG "Compile with modest debugging turned on" OFF)
 option(HPCG_DETAILED_DEBUG "Compile with voluminous debugging information turned on" OFF)
 option(HPCG_DETAILED_TIMING "Enable detail timers" OFF)
 option(HPCG_REFERENCE "Build reference mode" OFF)
+option(HPCG_BUILD_FOR_CRAYPAT "Build for analysis with Cray PAT" OFF)
 option(BUILD_TEST "Build rocHPCG single-node test" OFF)
 
 # Optimization options

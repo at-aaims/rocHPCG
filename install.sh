@@ -222,13 +222,14 @@ supported_distro
 install_package=false
 install_dependencies=false
 install_prefix=rochpcg-install
+build_type=release
 build_release=true
-build_debug=false
 build_reference=false
 build_test=false
 with_rocm=/opt/rocm
-with_mpi=deps/openmpi
-gpu_aware_mpi=OFF
+#with_mpi=deps/openmpi
+with_mpi=infer
+gpu_aware_mpi=ON
 with_omp=ON
 with_memmgmt=ON
 with_memdefrag=ON
@@ -241,7 +242,7 @@ with_roctx=false
 # check if we have a modern version of getopt that can handle whitespace and long parameters
 getopt -T
 if [[ $? -eq 4 ]]; then
-  GETOPT_PARSE=$(getopt --name "${0}" --longoptions help,install,dependencies,reference,debug,relwithdebinfo,test,with-rocm:,with-mpi:,gpu-aware-mpi:,with-openmp:,with-memmgmt:,with-memdefrag:,with-roctx --options hidrgt -- "$@")
+  GETOPT_PARSE=$(getopt --name "${0}" --longoptions help,install,dependencies,reference,debug,relwithdebinfo,test,build-type:,with-rocm:,with-mpi:,gpu-aware-mpi:,with-openmp:,with-memmgmt:,with-memdefrag:,with-roctx --options hidrgt -- "$@")
 else
   echo "Need a new version of getopt"
   exit 1
@@ -271,15 +272,18 @@ while true; do
         shift ;;
     -g|--debug)
         build_release=false
-        build_debug=true
+        build_type="debug"
         shift ;;
     --relwithdebinfo)
         build_release=false
-        build_debug=false
+        build_type="relwithdebinfo"
         shift ;;
     -t|--test)
         build_test=true
         shift ;;
+    --build-type)
+        build_type=${2}
+        shift 2 ;;
     --with-rocm)
         with_rocm=${2}
         shift 2 ;;
@@ -315,12 +319,25 @@ printf "\033[32mCreating project build directory in: \033[33m${build_dir}\033[0m
 # prep
 # #################################################
 # ensure a clean build environment
-if [[ "${build_release}" == true ]]; then
+#if [[ "${build_release}" == true ]]; then
+#  rm -rf ${build_dir}/release
+#elif [[ "${build_debug}" == true ]]; then
+#  rm -rf ${build_dir}/debug
+#else
+#  rm -rf ${build_dir}/relwithdebinfo
+#fi
+
+if [[ "${build_type}" == "release" ]]; then
   rm -rf ${build_dir}/release
-elif [[ "${build_debug}" == true ]]; then
+elif [[ "${build_type}" == "debug" ]]; then
   rm -rf ${build_dir}/debug
-else
+elif [[ "${build_type}" == "relwithdebinfo" ]]; then
   rm -rf ${build_dir}/relwithdebinfo
+elif [[ "${build_type}" == "craypat" ]]; then
+  rm -rf ${build_dir}/craypat
+else
+  echo "Invalid build type!"
+  exit 1
 fi
 
 # Default cmake executable is called cmake
@@ -349,9 +366,9 @@ pushd .
   # #################################################
   # MPI
   # #################################################
-  if [[ "${with_mpi}" == deps/openmpi ]]; then
-    install_openmpi
-  fi
+  #if [[ "${with_mpi}" == deps/openmpi ]]; then
+  #  install_openmpi
+  #fi
 
   # #################################################
   # configure & build
@@ -366,19 +383,36 @@ pushd .
   # mpi
   if [[ "${with_mpi}" == off || "${with_mpi}" == false || "${with_mpi}" == 0 || "${with_mpi}" == disabled ]]; then
     cmake_common_options="${cmake_common_options} -DHPCG_MPI=OFF"
-  else
+  elif [[ "${with_mpi}" != "infer" ]]; then
     cmake_common_options="${cmake_common_options} -DHPCG_MPI_DIR=${with_mpi}"
   fi
   shopt -u nocasematch
 
   # build type
-  if [[ "${build_release}" == true ]]; then
+  #if [[ "${build_release}" == true ]]; then
+  #  mkdir -p ${build_dir}/release && cd ${build_dir}/release
+  #  cmake_common_options="${cmake_common_options} -DCMAKE_BUILD_TYPE=Release"
+  #elif [[ "${build_debug}" == true ]]; then
+  #  mkdir -p ${build_dir}/debug && cd ${build_dir}/debug
+  #  cmake_common_options="${cmake_common_options} -DCMAKE_BUILD_TYPE=Debug"
+  #else
+  #  mkdir -p ${build_dir}/relwithdebinfo && cd ${build_dir}/relwithdebinfo
+  #  cmake_common_options="${cmake_common_options} -DCMAKE_BUILD_TYPE=RelWithDebInfo"
+  #fi
+  
+  if [[ "${build_type}" == "release" ]]; then
     mkdir -p ${build_dir}/release && cd ${build_dir}/release
     cmake_common_options="${cmake_common_options} -DCMAKE_BUILD_TYPE=Release"
-  elif [[ "${build_debug}" == true ]]; then
+  elif [[ "${build_type}" == "debug" ]]; then
     mkdir -p ${build_dir}/debug && cd ${build_dir}/debug
     cmake_common_options="${cmake_common_options} -DCMAKE_BUILD_TYPE=Debug"
-  else
+  elif [[ "${build_type}" == "craypat" ]]; then
+    mkdir -p ${build_dir}/craypat && cd ${build_dir}/craypat
+    cmake_common_options+=" -DHPCG_BUILD_FOR_CRAYPAT=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo "
+    cmake_common_options+="-DHIP_HIPCC_FLAGS=\"$(pat_opts include hipcc) $(pat_opts pre_compile hipcc) $(pat_opts post_compile hipcc)\""
+    cmake_common_options+=' -DCMAKE_CXX_FLAGS="-ggdb" '
+    cmake_common_options+="-DCMAKE_EXE_LINKER_FLAGS=\"$(pat_opts pre_link hipcc)\""
+  elif [[ "${build_type}" == "relwithdebinfo" ]]; then
     mkdir -p ${build_dir}/relwithdebinfo && cd ${build_dir}/relwithdebinfo
     cmake_common_options="${cmake_common_options} -DCMAKE_BUILD_TYPE=RelWithDebInfo"
   fi
@@ -393,7 +427,15 @@ pushd .
     cmake_common_options="${cmake_common_options} -DBUILD_TEST=ON"
   fi
 
+  echo CMake line:
+  echo ${cmake_executable} ${cmake_common_options} \
+    -DCPACK_SET_DESTDIR=OFF \
+    -DCMAKE_INSTALL_PREFIX=${install_prefix} \
+    -DCPACK_PACKAGING_INSTALL_PREFIX=${with_rocm} \
+    -DROCM_PATH="${with_rocm}" ../..
+
   # Build library with AMD toolchain because of existense of device kernels
+  echo Using cmake from $(which cmake)
   ${cmake_executable} ${cmake_common_options} \
     -DCPACK_SET_DESTDIR=OFF \
     -DCMAKE_INSTALL_PREFIX=${install_prefix} \
