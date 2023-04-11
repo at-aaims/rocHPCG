@@ -410,7 +410,7 @@ pushd .
     mkdir -p ${build_dir}/craypat && cd ${build_dir}/craypat
     cmake_common_options+=" -DHPCG_BUILD_FOR_CRAYPAT=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo "
     cmake_common_options+="-DHIP_HIPCC_FLAGS=\"$(pat_opts include hipcc) $(pat_opts pre_compile hipcc) $(pat_opts post_compile hipcc)\""
-    cmake_common_options+=' -DCMAKE_CXX_FLAGS="-ggdb" '
+    cmake_common_options+=" -DCMAKE_CXX_FLAGS=\"$(pat_opts include hipcc) -DCRAYPAT -ggdb\" "
     cmake_common_options+="-DCMAKE_EXE_LINKER_FLAGS=\"$(pat_opts pre_link hipcc)\""
   elif [[ "${build_type}" == "relwithdebinfo" ]]; then
     mkdir -p ${build_dir}/relwithdebinfo && cd ${build_dir}/relwithdebinfo
