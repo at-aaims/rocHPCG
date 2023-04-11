@@ -208,8 +208,10 @@ void ExchangeHaloAsync(const SparseMatrix& A, Vector& x)
         offset += nrecv;
     }
 
-    // Synchronize stream to make sure that send buffer is available
-    HIP_CHECK(hipStreamSynchronize(stream_halo));
+//#if !defined(GPU_AWARE_MPI)
+//    // Synchronize stream to make sure that send buffer is available
+//    HIP_CHECK(hipStreamSynchronize(stream_halo));
+//#endif
 
     // Post async boundary sends
     offset = 0;
