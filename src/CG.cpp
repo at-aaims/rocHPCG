@@ -54,6 +54,10 @@
 #include <roctracer/roctx.h>
 #endif
 
+#ifdef CRAYPAT
+#include <pat_api.h>
+#endif
+
 #include "hpcg.hpp"
 
 #include "CG.hpp"
@@ -64,22 +68,42 @@
 #include "ComputeWAXPBY.hpp"
 
 
+inline void tick_sync(double& t0, const char* name) {
+#ifdef CRAYPAT
+    PAT_record(PAT_STATE_OFF);
+#endif
+    hipDeviceSynchronize();
+#ifndef HPCG_NO_MPI
+    MPI_Barrier(MPI_COMM_WORLD);
+#endif
+    t0 = mytimer();
+#ifdef OPT_ROCTX
+    roctxRangePush(name);
+#endif
+#ifdef CRAYPAT
+    PAT_record(PAT_STATE_ON);
+#endif
+}
+
+inline void tock_sync(const double t0, double& t) {
+#ifdef CRAYPAT
+    PAT_record(PAT_STATE_OFF);
+#endif
+    hipDeviceSynchronize();
+#ifdef OPT_ROCTX
+    roctxRangePop();
+#endif
+    t += mytimer() - t0;
+#ifdef CRAYPAT
+    PAT_record(PAT_STATE_ON);
+#endif
+}
+
+
 // Use TICK and TOCK to time a code section in MATLAB-like fashion
-#ifdef OPT_ROCTX // add roctx in TICK/TOCK
-#ifndef HPCG_NO_MPI
-#define TICK(x)  hipDeviceSynchronize(); MPI_Barrier(MPI_COMM_WORLD); t0 = mytimer(); roctxRangePush(x) //!< record current time in 't0'
-#else
-#define TICK(x)  hipDeviceSynchronize(); t0 = mytimer(); roctxRangePush(x) //!< record current time in 't0'
-#endif
-#define TOCK(t) hipDeviceSynchronize(); roctxRangePop(); t += mytimer() - t0 //!< store time difference in 't' using time in 't0'
-#else // don't include markers
-#ifndef HPCG_NO_MPI
-#define TICK(x)  hipDeviceSynchronize(); MPI_Barrier(MPI_COMM_WORLD); t0 = mytimer() //!< record current time in 't0'
-#else
-#define TICK(x)  hipDeviceSynchronize(); t0 = mytimer() //!< record current time in 't0'
-#endif
-#define TOCK(t) hipDeviceSynchronize(); t += mytimer() - t0 //!< store time difference in 't' using time in 't0'
-#endif
+
+#define TICK(_range_name) tick_sync(t0, _range_name)
+#define TOCK(_time_var) tock_sync(t0, _time_var)
 
 /*!
   Routine to compute an approximate solution to Ax = b
