@@ -253,7 +253,7 @@ with_roctx=false
 # check if we have a modern version of getopt that can handle whitespace and long parameters
 getopt -T
 if [[ $? -eq 4 ]]; then
-  GETOPT_PARSE=$(getopt --name "${0}" --longoptions help,install,dependencies,reference,debug,test,with-rocm:,with-mpi:,gpu-aware-mpi:,with-openmp:,with-memmgmt:,with-memdefrag:,with-roctx --options hidrgt -- "$@")
+  GETOPT_PARSE=$(getopt --name "${0}" --longoptions help,install,dependencies,reference,debug,test,with-rocm:,with-mpi:,gpu-aware-mpi:,with-openmp:,with-memmgmt:,with-memdefrag:,with-roctx,prefix: --options hidrgt -- "$@")
 else
   echo "Need a new version of getopt"
   exit 1
@@ -306,8 +306,11 @@ while true; do
         with_memdefrag=${2}
         shift 2 ;;
     --with-roctx)
-	with_roctx=true
-	shift ;;
+        with_roctx=true
+        shift ;;
+    --prefix)
+        install_prefix=${2}
+        shift 2 ;;
     --) shift ; break ;;
     *)  echo "Unexpected command line parameter received; aborting";
         exit 1

@@ -149,7 +149,9 @@ endif()
 target_include_directories(rochpcg
                              PRIVATE
                                $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
-                               $<BUILD_INTERFACE:${HIP_INCLUDE_DIRS}>)
+                               $<BUILD_INTERFACE:${HIP_INCLUDE_DIRS}>
+                               $<BUILD_INTERFACE:${HPCG_MPI_DIR}/include>
+                           )
 
 # HIP
 target_link_libraries(rochpcg PRIVATE hip::host)
@@ -163,6 +165,9 @@ endif()
 # MPI
 if(HPCG_MPI)
   target_link_libraries(rochpcg PRIVATE MPI::MPI_CXX libnuma::libnuma)
+  if(GPU_AWARE_MPI)
+      target_link_libraries(rochpcg PRIVATE ${GTL_LIB})
+  endif()
 else()
   target_compile_definitions(rochpcg PRIVATE HPCG_NO_MPI)
 endif()
