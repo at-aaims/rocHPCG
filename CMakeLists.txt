@@ -68,7 +68,7 @@ option(BUILD_TEST "Build rocHPCG single-node test" OFF)
 # Optimization options
 option(OPT_MEMMGMT "Build with memory management module" ON)
 option(OPT_DEFRAG "Build with memory management defragmentation" ON)
-option(GPU_AWARE_MPI "Enable use of GPU-Aware MPI functionality" OFF)
+option(GPU_AWARE_MPI "Enable use of GPU-Aware MPI functionality" ON)
 
 # roctx Markers
 option(OPT_ROCTX "Enable rocTX markers" OFF)
