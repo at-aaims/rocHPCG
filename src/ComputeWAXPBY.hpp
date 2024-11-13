@@ -44,6 +44,7 @@
 #define COMPUTEWAXPBY_HPP
 
 #include "Vector.hpp"
+#include "CGData.hpp"
 
 int ComputeWAXPBY(local_int_t n,
                   double alpha,
@@ -58,6 +59,7 @@ int ComputeFusedWAXPBYDot(local_int_t n,
                           const Vector& x,
                           Vector& y,
                           double& result,
-                          double& time_allreduce);
+                          double& time_allreduce,
+                          MonitorOpts mo);
 
 #endif // COMPUTEWAXPBY_HPP

@@ -66,6 +66,7 @@ using std::endl;
 
 #ifdef OPT_ROCTX
 #include <roctracer/roctx.h>
+#include <roctracer/roctracer_ext.h>
 #endif
 
 
@@ -95,6 +96,7 @@ using std::endl;
 #include "TestSymmetry.hpp"
 #include "TestNorms.hpp"
 #include "Version.hpp"
+#include "tracing.hpp"
 
 /*!
   Main driver program: Construct synthetic problem, run V&V tests, compute benchmark parameters, run benchmark, report results.
@@ -188,7 +190,6 @@ int main(int argc, char * argv[]) {
 
   // Use this array for collecting timing information
   std::vector< double > times(10,0.0);
-
 
   double setup_time = mytimer();
 #ifdef OPT_ROCTX
@@ -420,7 +421,20 @@ int main(int argc, char * argv[]) {
   for (int i=0; i< numberOfCalls; ++i) {
     HIPZeroVector(x); // start x at all zeros
     double last_cummulative_time = opt_times[0];
-    ierr = CG( A, data, b, x, optMaxIters, refTolerance, niters, normr, normr0, &opt_times[0], true, true);
+    MonitorOpts mo{true, true};
+
+#ifdef HPCG_TRACING_ENABLED
+    // start tracing
+    roctracer_start();
+    do_clock_sync(geom);
+#endif
+
+    ierr = CG( A, data, b, x, optMaxIters, refTolerance, mo, niters, normr, normr0, &opt_times[0], true);
+
+#ifdef HPCG_TRACING_ENABLED
+    roctracer_stop();
+#endif
+
     if (ierr) ++err_count; // count the number of errors in CG
     if (normr / normr0 > refTolerance) ++tolerance_failures; // the number of failures to reduce residual
 
@@ -501,8 +515,9 @@ int main(int argc, char * argv[]) {
 
   while(total_runtime - times[0] > 0.0 || actualCgSets < numberOfCgSets)
   {
+    MonitorOpts mo{false, false};
     HIPZeroVector(x); // Zero out x
-    ierr = CG( A, data, b, x, optMaxIters, optTolerance, niters, normr, normr0, &times[0], true, false);
+    ierr = CG( A, data, b, x, optMaxIters, optTolerance, mo, niters, normr, normr0, &times[0], true);
     if (ierr) HPCG_fout << "Error in call to CG: " << ierr << ".\n" << endl;
     if (rank==0) HPCG_fout << "Call [" << actualCgSets << "] Scaled Residual [" << normr/normr0 << "]" << endl;
 
@@ -547,7 +562,7 @@ int main(int argc, char * argv[]) {
   // All processors are needed here.
 #ifdef HPCG_DEBUG
   double residual = 0;
-  ierr = ComputeResidual(A.localNumberOfRows, x, xexact, residual);
+  ierr = ComputeResidual(A.localNumberOfRows, x, xexact, residual, MonitorOpts{false, false});
   if (ierr) HPCG_fout << "Error in call to compute_residual: " << ierr << ".\n" << endl;
   if (rank==0) HPCG_fout << "Difference between computed and exact  = " << residual << ".\n" << endl;
 #endif

@@ -106,5 +106,11 @@ inline void HIPDeleteCGData(CGData& data)
     HIPDeleteVector (data.Ap);
 }
 
+/// Flags related to monitoring
+struct MonitorOpts {
+    bool trace;
+    bool verbose;
+};
+
 #endif // CGDATA_HPP
 

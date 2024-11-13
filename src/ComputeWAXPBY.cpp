@@ -200,7 +200,8 @@ int ComputeFusedWAXPBYDot(local_int_t n,
                           const Vector& x,
                           Vector& y,
                           double& result,
-                          double& time_allreduce)
+                          double& time_allreduce,
+                          const MonitorOpts mo)
 {
     assert(x.localLength >= n);
     assert(y.localLength >= n);
@@ -223,11 +224,15 @@ int ComputeFusedWAXPBYDot(local_int_t n,
     double global_result = 0.0;
 
 #ifdef OPT_ROCTX
-    roctxRangePush("MPI AllReduce");
+    if(mo.trace) {
+      roctxRangePush("MPI AllReduce");
+    }
 #endif
     MPI_Allreduce(&local_result, &global_result, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 #ifdef OPT_ROCTX
-    roctxRangePop();
+    if(mo.trace) {
+      roctxRangePop();
+    }
 #endif
 
     result = global_result;

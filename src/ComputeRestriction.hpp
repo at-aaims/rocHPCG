@@ -31,8 +31,9 @@
 
 #include "Vector.hpp"
 #include "SparseMatrix.hpp"
+#include "CGData.hpp"
 
 int ComputeRestriction(const SparseMatrix& A, const Vector& rf);
-int ComputeFusedSpMVRestriction(const SparseMatrix& A, const Vector& rf, Vector& xf);
+int ComputeFusedSpMVRestriction(const SparseMatrix& A, const Vector& rf, Vector& xf, MonitorOpts mo);
 
 #endif // COMPUTERESTRICTION_HPP

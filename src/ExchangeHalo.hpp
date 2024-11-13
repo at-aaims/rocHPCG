@@ -45,11 +45,12 @@
 
 #include "SparseMatrix.hpp"
 #include "Vector.hpp"
+#include "CGData.hpp"
 
 void ExchangeHalo(const SparseMatrix & A, Vector & x);
 
 void PrepareSendBuffer(const SparseMatrix& A, const Vector& x);
 void ExchangeHaloAsync(const SparseMatrix& A, Vector& x);
-void ObtainRecvBuffer(const SparseMatrix& A, Vector& x);
+void ObtainRecvBuffer(const SparseMatrix& A, Vector& x, MonitorOpts mo);
 
 #endif // EXCHANGEHALO_HPP

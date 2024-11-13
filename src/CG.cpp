@@ -67,14 +67,28 @@
 // Use TICK and TOCK to time a code section in MATLAB-like fashion
 #ifdef OPT_ROCTX // add roctx in TICK/TOCK
 #ifndef HPCG_NO_MPI
-#define TICK(x)  hipDeviceSynchronize(); MPI_Barrier(MPI_COMM_WORLD); t0 = mytimer(); roctxRangePush(x) //!< record current time in 't0'
+#define TICK(x)  \
+    hipDeviceSynchronize(); \
+    MPI_Barrier(MPI_COMM_WORLD); \
+    t0 = mytimer(); \
+    if (mo.trace) \
+      roctxRangePush(x) //!< record current time in 't0'
 #else
-#define TICK(x)  hipDeviceSynchronize(); t0 = mytimer(); roctxRangePush(x) //!< record current time in 't0'
+#define TICK(x)  \
+    hipDeviceSynchronize(); t0 = mytimer(); \
+    if (mo.trace) \
+      roctxRangePush(x) //!< record current time in 't0'
 #endif
-#define TOCK(t) hipDeviceSynchronize(); roctxRangePop(); t += mytimer() - t0 //!< store time difference in 't' using time in 't0'
+#define TOCK(t) \
+    hipDeviceSynchronize(); \
+    if (mo.trace) \
+      roctxRangePop(); \
+    t += mytimer() - t0 //!< store time difference in 't' using time in 't0'
 #else // don't include markers
 #ifndef HPCG_NO_MPI
-#define TICK(x)  hipDeviceSynchronize(); MPI_Barrier(MPI_COMM_WORLD); t0 = mytimer() //!< record current time in 't0'
+#define TICK(x) \
+    hipDeviceSynchronize(); MPI_Barrier(MPI_COMM_WORLD); \
+    t0 = mytimer() //!< record current time in 't0'
 #else
 #define TICK(x)  hipDeviceSynchronize(); t0 = mytimer() //!< record current time in 't0'
 #endif
@@ -102,10 +116,11 @@
   @see CG_ref()
 */
 int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
-    const int max_iter, const double tolerance, int & niters, double & normr, double & normr0,
-    double * times, bool doPreconditioning, bool verbose) {
+    const int max_iter, const double tolerance, const MonitorOpts mo,
+    int & niters, double & normr, double & normr0,
+    double * times, bool doPreconditioning) {
 #ifdef OPT_ROCTX
-  roctxRangePush("Total Time");
+  //roctxRangePush("Total Time");
 #endif
   double t_begin = mytimer();  // Start timing right away
   normr = 0.0;
@@ -131,14 +146,14 @@ int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
 #endif
   // p is of length ncols, copy x to p for sparse MV operation
   HIPCopyVector(x, p);
-  TICK("SpMV"); ComputeSPMV(A, p, Ap); TOCK(t3); // Ap = A*p
+  TICK("SpMV"); ComputeSPMV(A, p, Ap, mo); TOCK(t3); // Ap = A*p
   TICK("WAXPBY"); ComputeWAXPBY(nrow, 1.0, b, -1.0, Ap, r, A.isWaxpbyOptimized);  TOCK(t2); // r = b - Ax (x stored in p)
-  TICK("DDOT"); ComputeDotProduct(nrow, r, r, normr, t4, A.isDotProductOptimized); TOCK(t1);
+  TICK("DDOT"); ComputeDotProduct(nrow, r, r, normr, t4, A.isDotProductOptimized, mo); TOCK(t1);
   normr = sqrt(normr);
 #ifdef HPCG_DEBUG
   if (A.geom->rank==0) HPCG_fout << "Initial Residual = "<< normr << std::endl;
 #endif
-  if(A.geom->rank == 0 && verbose) printf("HIP Initial Residual = %le\n", normr);
+  if(A.geom->rank == 0 && mo.verbose) printf("HIP Initial Residual = %le\n", normr);
 
   // Record initial residual for convergence testing
   normr0 = normr;
@@ -148,38 +163,40 @@ int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
   for (int k=1; k<=max_iter && normr/normr0 > tolerance; k++ ) {
     TICK("MG");
     if (doPreconditioning)
-      ComputeMG(A, r, z); // Apply preconditioner
+      ComputeMG(A, r, z, mo); // Apply preconditioner
     else
       HIPCopyVector (r, z); // copy r to z (no preconditioning)
     TOCK(t5); // Preconditioner apply time
 
     if (k == 1) {
       TICK("WAXPBY"); ComputeWAXPBY(nrow, 1.0, z, 0.0, z, p, A.isWaxpbyOptimized); TOCK(t2); // Copy Mr to p
-      TICK("DDOT"); ComputeDotProduct (nrow, r, z, rtz, t4, A.isDotProductOptimized); TOCK(t1); // rtz = r'*z
+      TICK("DDOT"); ComputeDotProduct (nrow, r, z, rtz, t4, A.isDotProductOptimized, mo); TOCK(t1); // rtz = r'*z
     } else {
       oldrtz = rtz;
-      TICK("DDOT"); ComputeDotProduct (nrow, r, z, rtz, t4, A.isDotProductOptimized); TOCK(t1); // rtz = r'*z
+      TICK("DDOT"); ComputeDotProduct (nrow, r, z, rtz, t4, A.isDotProductOptimized, mo); TOCK(t1); // rtz = r'*z
       beta = rtz/oldrtz;
       TICK("WAXPBY"); ComputeWAXPBY (nrow, 1.0, z, beta, p, p, A.isWaxpbyOptimized);  TOCK(t2); // p = beta*p + z
     }
 
-    TICK("SpMV"); ComputeSPMV(A, p, Ap); TOCK(t3); // Ap = A*p
-    TICK("DDOT"); ComputeDotProduct(nrow, p, Ap, pAp, t4, A.isDotProductOptimized); TOCK(t1); // alpha = p'*Ap
+    TICK("SpMV"); ComputeSPMV(A, p, Ap, mo); TOCK(t3); // Ap = A*p
+    TICK("DDOT"); ComputeDotProduct(nrow, p, Ap, pAp, t4, A.isDotProductOptimized, mo); TOCK(t1); // alpha = p'*Ap
     alpha = rtz/pAp;
 #ifndef HPCG_REFERENCE
-    TICK("WAXPBY"); ComputeFusedWAXPBYDot(nrow, -alpha, Ap, r, normr, t4);
+    TICK("WAXPBY"); ComputeFusedWAXPBYDot(nrow, -alpha, Ap, r, normr, t4, mo);
             ComputeWAXPBY(nrow, 1.0, x, alpha, p, x, A.isWaxpbyOptimized); TOCK(t2); // x = x + alpha*p
 #else
     TICK("WAXPBY"); ComputeWAXPBY(nrow, 1.0, x, alpha, p, x, A.isWaxpbyOptimized);// x = x + alpha*p
             ComputeWAXPBY(nrow, 1.0, r, -alpha, Ap, r, A.isWaxpbyOptimized);  TOCK(t2);// r = r - alpha*Ap
-    TICK("DDOT"); ComputeDotProduct(nrow, r, r, normr, t4, A.isDotProductOptimized); TOCK(t1);
+    TICK("DDOT"); ComputeDotProduct(nrow, r, r, normr, t4, A.isDotProductOptimized, mo); TOCK(t1);
 #endif
     normr = sqrt(normr);
 #ifdef HPCG_DEBUG
     if (A.geom->rank==0 && (k%print_freq == 0 || k == max_iter))
       HPCG_fout << "Iteration = "<< k << "   Scaled Residual = "<< normr/normr0 << std::endl;
 #endif
-    if(A.geom->rank == 0 && verbose) printf("HIP Iteration = %d   Scaled Residual = %le\n", k, normr / normr0);
+    if(A.geom->rank == 0 && mo.verbose) {
+        printf("HIP Iteration = %d   Scaled Residual = %le\n", k, normr / normr0);
+    }
     niters = k;
   }
 
@@ -193,7 +210,7 @@ int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
 //  times[6] += t6; // exchange halo time
 //#endif
 #ifdef OPT_ROCTX
-  roctxRangePop(); // Total Time
+  //roctxRangePop(); // Total Time
 #endif
   times[0] += mytimer() - t_begin;  // Total time. All done...
   return 0;

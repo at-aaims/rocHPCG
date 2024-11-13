@@ -81,6 +81,7 @@ set(rochpcg_source
   YAML_Element.cpp
   finalize.cpp
   mytimer.cpp
+  tracing.cpp
 )
 
 # Flag source files as hip source files
@@ -144,6 +145,10 @@ endif()
 if(GPU_AWARE_MPI)
   target_compile_definitions(rochpcg PRIVATE GPU_AWARE_MPI)
 endif()
+if(HPCG_TRACING_ENABLED)
+  message(STATUS "Enabling tracing-related code.")
+  target_compile_definitions(rochpcg PRIVATE HPCG_TRACING_ENABLED)
+endif()
 
 # Target include directories
 target_include_directories(rochpcg
@@ -159,7 +164,10 @@ target_link_libraries(rochpcg PRIVATE hip::host)
 # Roctx
 if(OPT_ROCTX)
   target_compile_definitions(rochpcg PRIVATE OPT_ROCTX)
-  target_link_libraries(rochpcg PRIVATE "${ROCM_PATH}/lib/libroctx64.so")
+  #target_link_libraries(rochpcg PRIVATE "${ROCM_PATH}/lib/libroctx64.so")
+  target_include_directories(rochpcg PRIVATE $<BUILD_INTERFACE:${ROCM_PATH}/include/roctracer>)
+  target_link_libraries(rochpcg PRIVATE roc::roctracer)
+  target_link_libraries(rochpcg PRIVATE roc::roctx)
 endif()
 
 # MPI
@@ -203,9 +211,17 @@ else()
 endif()
 set_target_properties(rochpcg PROPERTIES DEBUG_POSTFIX "-d")
 
+set(ROCHPCG_BIN "${CMAKE_INSTALL_PREFIX}/bin/rochpcg-${PROJECT_VERSION}")
+# Configure run scripts
+configure_file("${CMAKE_SOURCE_DIR}/run_trace.in"
+                "${CMAKE_BINARY_DIR}/run_trace.sh"
+                @ONLY)
+
 # Install targets
 rocm_install_targets(TARGETS rochpcg
                      PREFIX rochpcg)
+
+install(PROGRAMS ${CMAKE_BINARY_DIR}/run_trace.sh DESTINATION ${CMAKE_INSTALL_PREFIX})
 
 # Symbolic links
 rocm_install_symlink_subdir(rochpcg)

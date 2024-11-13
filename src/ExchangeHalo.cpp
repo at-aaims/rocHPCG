@@ -249,18 +249,22 @@ void ExchangeHaloAsync(const SparseMatrix& A, Vector& x)
     }
 }
 
-void ObtainRecvBuffer(const SparseMatrix& A, Vector& x)
+void ObtainRecvBuffer(const SparseMatrix& A, Vector& x, const MonitorOpts mo)
 {
     int num_neighbors = A.numberOfSendNeighbors;
 
 #ifdef OPT_ROCTX
-    roctxRangePush("MPI ExchangeHalo");
+    if(mo.trace) {
+      roctxRangePush("MPI ExchangeHalo");
+    }
 #endif
     // Synchronize boundary transfers
     EXIT_IF_HPCG_ERROR(MPI_Waitall(num_neighbors, A.recv_request, MPI_STATUSES_IGNORE));
     EXIT_IF_HPCG_ERROR(MPI_Waitall(num_neighbors, A.send_request, MPI_STATUSES_IGNORE));
 #ifdef OPT_ROCTX
-    roctxRangePop();
+    if(mo.trace) {
+      roctxRangePop();
+    }
 #endif
 
 #ifndef GPU_AWARE_MPI

@@ -245,6 +245,7 @@ with_omp=ON
 with_memmgmt=ON
 with_memdefrag=ON
 with_roctx=false
+with_tracing=false
 
 # #################################################
 # Parameter parsing
@@ -253,7 +254,7 @@ with_roctx=false
 # check if we have a modern version of getopt that can handle whitespace and long parameters
 getopt -T
 if [[ $? -eq 4 ]]; then
-  GETOPT_PARSE=$(getopt --name "${0}" --longoptions help,install,dependencies,reference,debug,test,with-rocm:,with-mpi:,gpu-aware-mpi:,with-openmp:,with-memmgmt:,with-memdefrag:,with-roctx,prefix: --options hidrgt -- "$@")
+  GETOPT_PARSE=$(getopt --name "${0}" --longoptions help,install,dependencies,reference,debug,test,with-rocm:,with-mpi:,gpu-aware-mpi:,with-openmp:,with-memmgmt:,with-memdefrag:,with-roctx,with-tracing,prefix: --options hidrgt -- "$@")
 else
   echo "Need a new version of getopt"
   exit 1
@@ -307,6 +308,9 @@ while true; do
         shift 2 ;;
     --with-roctx)
         with_roctx=true
+        shift ;;
+    --with-tracing)
+        with_tracing=true
         shift ;;
     --prefix)
         install_prefix=${2}
@@ -396,6 +400,11 @@ pushd .
   # build test
   if [[ "${build_test}" == true ]]; then
     cmake_common_options="${cmake_common_options} -DBUILD_TEST=ON"
+  fi
+
+  # build for tracing
+  if [[ "${with_tracing}" == true ]]; then
+    cmake_common_options="${cmake_common_options} -DHPCG_TRACING_ENABLED=ON"
   fi
 
   # Build library with AMD toolchain because of existense of device kernels

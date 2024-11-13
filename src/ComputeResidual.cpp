@@ -118,7 +118,7 @@ __global__ void kernel_residual_part2(double* workspace)
     }
 }
 
-int ComputeResidual(local_int_t n, const Vector& v1, const Vector& v2, double& residual)
+int ComputeResidual(local_int_t n, const Vector& v1, const Vector& v2, double& residual, const MonitorOpts mo)
 {
     double* tmp = reinterpret_cast<double*>(workspace);
 
@@ -136,11 +136,15 @@ int ComputeResidual(local_int_t n, const Vector& v1, const Vector& v2, double& r
     double global_residual = 0.0;
 
 #ifdef OPT_ROCTX
-    roctxRangePush("MPI AllReduce");
+    if(mo.trace) {
+      roctxRangePush("MPI AllReduce");
+    }
 #endif
     MPI_Allreduce(&local_residual, &global_residual, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
 #ifdef OPT_ROCTX
-    roctxRangePop();
+    if(mo.trace) {
+      roctxRangePop();
+    }
 #endif
 
     residual = global_residual;

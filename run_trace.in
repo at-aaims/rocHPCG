@@ -1,0 +1,163 @@
+#! /bin/bash
+
+rochpcg_bin=@ROCHPCG_BIN@
+NPX=0
+NPY=0
+NPZ=0
+NX=0
+NY=0
+NZ=0
+RUNTIME=0
+outfilename="out.hpcg"
+rocprof_trace_run=false
+hpct_trace_run=false
+trace_output_path="."
+num_ranks_traced=7
+
+# check if we have a modern version of getopt that can handle whitespace and long parameters
+getopt -T
+if [[ $? -eq 4 ]]; then
+  GETOPT_PARSE=$(getopt --name "${0}" \
+      --longoptions help,version,nx:,ny:,output_file:,nz:,rt:,pz:,zl:,npx:,npy:,npz:,dev:,rocprof,hpct,trace_output_path:,num_ranks_traced:, \
+      --options ho -- "$@")
+else
+  echo "Need a new version of getopt"
+  exit 1
+fi
+
+if [[ $? -ne 0 ]]; then
+  echo "getopt invocation failed; could not parse the command line";
+  exit 1
+fi
+
+eval set -- "${GETOPT_PARSE}"
+
+while true; do
+  case "${1}" in
+    -h|--help)
+        echo "HPCG tracing script"
+        exit 0
+        ;;
+    --version)
+        echo "rocHPCG version"
+        exit 0
+        ;;
+    --nx)
+        NX=${2}
+        shift 2 ;;
+    --ny)
+        NY=${2}
+        shift 2 ;;
+    --nz)
+        NZ=${2}
+        shift 2 ;;
+    --rt)
+        RUNTIME=${2}
+        shift 2 ;;
+    --pz)
+        PZ=${2}
+        shift 2 ;;
+    --zl)
+        NB=${2}
+        shift 2 ;;
+    --npx)
+        NPX=${2}
+        shift 2 ;;
+    --npy)
+        NPY=${2}
+        shift 2 ;;
+    --npz)
+        NPZ=${2}
+        shift 2 ;;
+    -o|--output_file)
+        outfilename=${2}
+        outputfile=true
+        shift 2 ;;
+    --rocprof)
+        rocprof_trace_run=true
+        shift ;;
+    --hpct)
+        hpct_trace_run=true
+        shift ;;
+    --trace_output_path)
+        trace_output_path=${2}
+        shift 2 ;;
+    --num_ranks_traced)
+        num_ranks_traced=${2}
+        shift 2 ;;
+    --) shift ; break ;;
+    *)  echo "Unexpected command line parameter received; aborting";
+        exit 1
+        ;;
+  esac
+done
+
+if [[ $RUNTIME -eq 0 || $NX -eq 0 || $NY -eq 0 || $NZ -eq 0 ]]; then
+    echo "Insufficient arguments! --nx --ny --nz --rt are required."
+    exit -1
+fi
+
+if [[ $NPX -eq 0 || $NPY -eq 0 || $NPZ -eq 0 ]]; then
+    echo "Insufficient arguments for tracing: --npx --npy --npz are also required."
+    exit -1
+fi
+
+# Get local process numbering
+set +u
+if [[ -n ${OMPI_COMM_WORLD_LOCAL_RANK+x} ]]; then
+  globalRank=$OMPI_COMM_WORLD_RANK
+  globalSize=$OMPI_COMM_WORLD_SIZE
+  rank=$OMPI_COMM_WORLD_LOCAL_RANK
+  size=$OMPI_COMM_WORLD_LOCAL_SIZE
+elif [[ -n ${SLURM_LOCALID+x} ]]; then
+  globalRank=$SLURM_PROCID
+  globalSize=$SLURM_NTASKS
+  rank=$SLURM_LOCALID
+  size=$SLURM_TASKS_PER_NODE
+  #Slurm can return a string like "2(x2),1". Get the first number
+  size=$(echo $size | sed -r 's/^([^.]+).*$/\1/; s/^[^0-9]*([0-9]+).*$/\1/')
+fi
+set -u
+
+# Get this rank's coordinates in 3D process space
+IZ=$(( globalRank/(NPX*NPY) ))
+IY=$(( (globalRank-IZ*NPX*NPY)/NPX ))
+IX=$(( globalRank-IZ*NPX*NPY-IY*NPX ))
+MIDX=$((NPX/2))
+MIDY=$((NPY/2))
+MIDZ=$((NPZ/2))
+
+trace_this_rank=false
+
+if [[ "${rocprof_trace_run}" == true ]]; then
+    if [[ $IZ -eq $MIDZ || $IZ -eq $((MIDZ+1)) || $IZ -eq $((MIDZ-1)) ]]; then
+        if [[ $IY -eq $MIDY || $IY -eq $((MIDY+1)) || $IY -eq $((MIDY-1)) ]]; then
+            if [[ $IX -eq $MIDX || $IX -eq $((MIDX+1)) || $IX -eq $((MIDX-1)) ]]; then
+                trace_this_rank=true
+            fi
+        fi
+    fi
+fi
+
+trace_line=""
+if [[ "${rocprof_trace_run}" == true ]]; then
+    if [[ $globalRank -eq 0 ]]; then
+        echo "Tracing with rocprof"
+    fi
+    trace_line="rocprof --trace-start off --roctx-trace --hip-trace -d ${trace_output_path}/${SLURM_PROCID} -o ${trace_output_path}/${SLURM_PROCID}/results.csv"
+elif [[ "${hpct_trace_run}" == true ]]; then
+    if [[ $globalRank -eq 0 ]]; then
+        echo "Tracing with hpctoolkit"
+    fi
+    trace_line="hpcrun -o hpctoolkit-measurement-$SLURM_JOB_NAME-$SLURM_JOB_ID -e gpu=amd -e CPUTIME --trace"
+fi
+
+executor=""
+if [[ "${trace_this_rank}" == true ]]; then
+    echo  run_rocHPCG: Rank $globalRank will be traced.
+    executor=$trace_line
+fi
+
+#run
+${executor} ${rochpcg_bin} --nx=$NX --ny=$NY --nz=$NZ --rt=$RUNTIME --npx=$NPX --npy=$NPY --npz=$NPZ
+

@@ -63,6 +63,7 @@ option(HPCG_DEBUG "Compile with modest debugging turned on" OFF)
 option(HPCG_DETAILED_DEBUG "Compile with voluminous debugging information turned on" OFF)
 option(HPCG_DETAILED_TIMING "Enable detail timers" OFF)
 option(HPCG_REFERENCE "Build reference mode" OFF)
+option(HPCG_TRACING_ENABLED "Build tracing mode" OFF)
 option(BUILD_TEST "Build rocHPCG single-node test" OFF)
 
 # Optimization options
@@ -72,6 +73,10 @@ option(GPU_AWARE_MPI "Enable use of GPU-Aware MPI functionality" ON)
 
 # roctx Markers
 option(OPT_ROCTX "Enable rocTX markers" OFF)
+
+if(HPCG_TRACING_ENABLED AND NOT OPT_ROCTX AND NOT OPT_HPCTOOLKIT)
+    message(SEND_ERROR "Tracing enabled but no tracing option is selected! Please select OPT_ROCTX (--with-roctx)")
+endif()
 
 # Dependencies
 include(cmake/Dependencies.cmake)
@@ -100,3 +105,4 @@ rocm_setup_version(VERSION 0.8.5)
 
 # rocHPCG source directory
 add_subdirectory(src)
+

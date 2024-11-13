@@ -366,7 +366,7 @@ __global__ void kernel_backward_sweep_0(local_int_t m,
 
   @see ComputeSYMGS_ref
 */
-int ComputeSYMGS(const SparseMatrix& A, const Vector& r, Vector& x)
+int ComputeSYMGS(const SparseMatrix& A, const Vector& r, Vector& x, const MonitorOpts mo)
 {
     assert(x.localLength == A.localNumberOfColumns);
 
@@ -380,7 +380,7 @@ int ComputeSYMGS(const SparseMatrix& A, const Vector& r, Vector& x)
         if(A.ell_width == 27) LAUNCH_SYMGS_INTERIOR(1024, 27);
 
         ExchangeHaloAsync(A, x);
-        ObtainRecvBuffer(A, x);
+        ObtainRecvBuffer(A, x, mo);
 
         if(A.ell_width == 27) LAUNCH_SYMGS_HALO(256, 27);
 

@@ -14,8 +14,11 @@
 
 #ifndef COMPUTEDOTPRODUCT_HPP
 #define COMPUTEDOTPRODUCT_HPP
+
 #include "Vector.hpp"
+#include "CGData.hpp"
+
 int ComputeDotProduct(const local_int_t n, const Vector & x, const Vector & y,
-    double & result, double & time_allreduce, bool & isOptimized);
+    double & result, double & time_allreduce, bool & isOptimized, MonitorOpts mo);
 
 #endif // COMPUTEDOTPRODUCT_HPP

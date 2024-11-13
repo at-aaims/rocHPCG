@@ -196,7 +196,8 @@ int ComputeRestriction(const SparseMatrix& A, const Vector& rf)
     return 0;
 }
 
-int ComputeFusedSpMVRestriction(const SparseMatrix& A, const Vector& rf, Vector& xf)
+int ComputeFusedSpMVRestriction(const SparseMatrix& A, const Vector& rf, Vector& xf,
+        const MonitorOpts mo)
 {
 #ifndef HPCG_NO_MPI
     if(A.geom->size > 1)
@@ -211,7 +212,7 @@ int ComputeFusedSpMVRestriction(const SparseMatrix& A, const Vector& rf, Vector&
     if(A.geom->size > 1)
     {
         ExchangeHaloAsync(A, xf);
-        ObtainRecvBuffer(A, xf);
+        ObtainRecvBuffer(A, xf, mo);
 
         dim3 blocks((A.halo_rows - 1) / 128 + 1);
         dim3 threads(128);

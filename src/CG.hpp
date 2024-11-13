@@ -47,21 +47,25 @@
 #include "Vector.hpp"
 #include "CGData.hpp"
 
-int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
-    const int max_iter, const double tolerance, int & niters, double & normr,  double & normr0,
-    double * times, bool doPreconditioning, bool verbose);
 
-// this function will compute the Conjugate Gradient iterations.
-// geom - Domain and processor topology information
-// A - Matrix
-// b - constant
-// x - used for return value
-// max_iter - how many times we iterate
-// tolerance - Stopping tolerance for preconditioned iterations.
-// niters - number of iterations performed
-// normr - computed residual norm
-// normr0 - Original residual
-// times - array of timing information
-// doPreconditioning - bool to specify whether or not symmetric GS will be applied.
+/** Compute the Conjugate Gradient iterations.
+ *
+ * geom - Domain and processor topology information
+ * A - Matrix
+ * b - constant
+ * x - used for return value
+ * max_iter - how many times we iterate
+ * tolerance - Stopping tolerance for preconditioned iterations.
+ * @param m  Flags controlling how the run is monitored (tracing, verbosity etc.)
+ * niters - number of iterations performed
+ * normr - computed residual norm
+ * normr0 - Original residual
+ * times - array of timing information
+ * doPreconditioning - bool to specify whether or not symmetric GS will be applied.
+ */
+int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
+    const int max_iter, const double tolerance, MonitorOpts m,
+    int & niters, double & normr,  double & normr0,
+    double * times, bool doPreconditioning);
 
 #endif  // CG_HPP

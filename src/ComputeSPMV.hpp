@@ -16,7 +16,8 @@
 #define COMPUTESPMV_HPP
 #include "Vector.hpp"
 #include "SparseMatrix.hpp"
+#include "CGData.hpp"
 
-int ComputeSPMV( const SparseMatrix & A, Vector & x, Vector & y);
+int ComputeSPMV( const SparseMatrix & A, Vector & x, Vector & y, MonitorOpts mo);
 
 #endif  // COMPUTESPMV_HPP

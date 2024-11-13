@@ -68,6 +68,35 @@ endif()
 if(HPCG_MPI)
   find_package(LIBNUMA REQUIRED)
 endif()
+    
+# Add some paths
+list(APPEND CMAKE_PREFIX_PATH ${ROCBLAS_PATH} ${ROCM_PATH})
+
+find_library(ROCTRACER NAMES roctracer64
+             PATHS ${ROCM_PATH}/lib
+             NO_DEFAULT_PATH)
+find_library(ROCTX NAMES roctx64
+             PATHS ${ROCM_PATH}/lib
+             NO_DEFAULT_PATH)
+
+message("-- roctracer:  ${ROCTRACER}")
+message("-- roctx:      ${ROCTX}")
+
+add_library(roc::roctracer SHARED IMPORTED)
+set_target_properties(roc::roctracer PROPERTIES
+  INTERFACE_INCLUDE_DIRECTORIES "${ROCM_PATH}/include"
+  INTERFACE_LINK_LIBRARIES "hip::host"
+  IMPORTED_LOCATION "${ROCTRACER}"
+  IMPORTED_SONAME "libroctracer.so")
+add_library(roc::roctx SHARED IMPORTED)
+set_target_properties(roc::roctx PROPERTIES
+  INTERFACE_INCLUDE_DIRECTORIES "${ROCM_PATH}/include"
+  INTERFACE_LINK_LIBRARIES "hip::host"
+  IMPORTED_LOCATION "${ROCTX}"
+  IMPORTED_SONAME "libroctx64.so")
+
+# Find HIP package
+find_package(HIP REQUIRED)
 
 # rocm-cmake
 find_package(ROCM 0.7.3 QUIET CONFIG PATHS ${CMAKE_PREFIX_PATH} $ENV{ROCM_PATH})

@@ -223,7 +223,7 @@ __global__ void kernel_spmv_halo(local_int_t m,
 
   @see ComputeSPMV_ref
 */
-int ComputeSPMV(const SparseMatrix& A, Vector& x, Vector& y)
+int ComputeSPMV(const SparseMatrix& A, Vector& x, Vector& y, const MonitorOpts mo)
 {
     assert(x.localLength >= A.localNumberOfColumns);
     assert(y.localLength >= A.localNumberOfRows);
@@ -244,7 +244,7 @@ int ComputeSPMV(const SparseMatrix& A, Vector& x, Vector& y)
     if(A.geom->size > 1)
     {
         ExchangeHaloAsync(A, x);
-        ObtainRecvBuffer(A, x);
+        ObtainRecvBuffer(A, x, mo);
 
         if(&y != A.mgData->Axf)
         {

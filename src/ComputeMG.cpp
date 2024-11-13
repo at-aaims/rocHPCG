@@ -61,7 +61,7 @@
 
   @see ComputeMG_ref
 */
-int ComputeMG(const SparseMatrix& A, const Vector& r, Vector& x)
+int ComputeMG(const SparseMatrix& A, const Vector& r, Vector& x, const MonitorOpts mo)
 {
     assert(x.localLength == A.localNumberOfColumns);
 
@@ -73,24 +73,24 @@ int ComputeMG(const SparseMatrix& A, const Vector& r, Vector& x)
 
         for(int i = 1; i < numberOfPresmootherSteps; ++i)
         {
-            RETURN_IF_HPCG_ERROR(ComputeSYMGS(A, r, x));
+            RETURN_IF_HPCG_ERROR(ComputeSYMGS(A, r, x, mo));
         }
 
 #ifndef HPCG_REFERENCE
-        RETURN_IF_HPCG_ERROR(ComputeFusedSpMVRestriction(A, r, x));
+        RETURN_IF_HPCG_ERROR(ComputeFusedSpMVRestriction(A, r, x, mo));
 #else
-        RETURN_IF_HPCG_ERROR(ComputeSPMV(A, x, *A.mgData->Axf));
+        RETURN_IF_HPCG_ERROR(ComputeSPMV(A, x, *A.mgData->Axf, mo));
         RETURN_IF_HPCG_ERROR(ComputeRestriction(A, r));
 #endif
 
-        RETURN_IF_HPCG_ERROR(ComputeMG(*A.Ac, *A.mgData->rc, *A.mgData->xc));
+        RETURN_IF_HPCG_ERROR(ComputeMG(*A.Ac, *A.mgData->rc, *A.mgData->xc, mo));
         RETURN_IF_HPCG_ERROR(ComputeProlongation(A, x));
 
         int numberOfPostsmootherSteps = A.mgData->numberOfPostsmootherSteps;
 
         for(int i = 0; i < numberOfPostsmootherSteps; ++i)
         {
-            RETURN_IF_HPCG_ERROR(ComputeSYMGS(A, r, x));
+            RETURN_IF_HPCG_ERROR(ComputeSYMGS(A, r, x, mo));
         }
     }
     else

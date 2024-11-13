@@ -107,20 +107,22 @@ int TestSymmetry(SparseMatrix & A, Vector & b, Vector & xexact, TestSymmetryData
  double xNorm2, yNorm2;
  double ANorm = 2 * 26.0;
 
+ const MonitorOpts mo {false, false};
+
  // Next, compute x'*A*y
- ComputeDotProduct(nrow, y_ncol, y_ncol, yNorm2, t4, A.isDotProductOptimized);
- int ierr = ComputeSPMV(A, y_ncol, z_ncol); // z_nrow = A*y_overlap
+ ComputeDotProduct(nrow, y_ncol, y_ncol, yNorm2, t4, A.isDotProductOptimized, mo);
+ int ierr = ComputeSPMV(A, y_ncol, z_ncol, mo); // z_nrow = A*y_overlap
  if (ierr) HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
  double xtAy = 0.0;
- ierr = ComputeDotProduct(nrow, x_ncol, z_ncol, xtAy, t4, A.isDotProductOptimized); // x'*A*y
+ ierr = ComputeDotProduct(nrow, x_ncol, z_ncol, xtAy, t4, A.isDotProductOptimized, mo); // x'*A*y
  if (ierr) HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
 
  // Next, compute y'*A*x
- ComputeDotProduct(nrow, x_ncol, x_ncol, xNorm2, t4, A.isDotProductOptimized);
- ierr = ComputeSPMV(A, x_ncol, z_ncol); // b_computed = A*x_overlap
+ ComputeDotProduct(nrow, x_ncol, x_ncol, xNorm2, t4, A.isDotProductOptimized, mo);
+ ierr = ComputeSPMV(A, x_ncol, z_ncol, mo); // b_computed = A*x_overlap
  if (ierr) HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
  double ytAx = 0.0;
- ierr = ComputeDotProduct(nrow, y_ncol, z_ncol, ytAx, t4, A.isDotProductOptimized); // y'*A*x
+ ierr = ComputeDotProduct(nrow, y_ncol, z_ncol, ytAx, t4, A.isDotProductOptimized, mo); // y'*A*x
  if (ierr) HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
 
  testsymmetry_data.depsym_spmv = std::fabs((long double) (xtAy - ytAx))/((xNorm2*ANorm*yNorm2 + yNorm2*ANorm*xNorm2) * (DBL_EPSILON));
@@ -130,17 +132,17 @@ int TestSymmetry(SparseMatrix & A, Vector & b, Vector & xexact, TestSymmetryData
  // Test symmetry of multi-grid
 
  // Compute x'*Minv*y
- ierr = ComputeMG(A, y_ncol, z_ncol); // z_ncol = Minv*y_ncol
+ ierr = ComputeMG(A, y_ncol, z_ncol, mo); // z_ncol = Minv*y_ncol
  if (ierr) HPCG_fout << "Error in call to MG: " << ierr << ".\n" << endl;
  double xtMinvy = 0.0;
- ierr = ComputeDotProduct(nrow, x_ncol, z_ncol, xtMinvy, t4, A.isDotProductOptimized); // x'*Minv*y
+ ierr = ComputeDotProduct(nrow, x_ncol, z_ncol, xtMinvy, t4, A.isDotProductOptimized, mo); // x'*Minv*y
  if (ierr) HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
 
  // Next, compute z'*Minv*x
- ierr = ComputeMG(A, x_ncol, z_ncol); // z_ncol = Minv*x_ncol
+ ierr = ComputeMG(A, x_ncol, z_ncol, mo); // z_ncol = Minv*x_ncol
  if (ierr) HPCG_fout << "Error in call to MG: " << ierr << ".\n" << endl;
  double ytMinvx = 0.0;
- ierr = ComputeDotProduct(nrow, y_ncol, z_ncol, ytMinvx, t4, A.isDotProductOptimized); // y'*Minv*x
+ ierr = ComputeDotProduct(nrow, y_ncol, z_ncol, ytMinvx, t4, A.isDotProductOptimized, mo); // y'*Minv*x
  if (ierr) HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
 
  testsymmetry_data.depsym_mg = std::fabs((long double) (xtMinvy - ytMinvx))/((xNorm2*ANorm*yNorm2 + yNorm2*ANorm*xNorm2) * (DBL_EPSILON));
@@ -152,9 +154,9 @@ int TestSymmetry(SparseMatrix & A, Vector & b, Vector & xexact, TestSymmetryData
  int numberOfCalls = 2;
  double residual = 0.0;
  for (int i=0; i< numberOfCalls; ++i) {
-   ierr = ComputeSPMV(A, x_ncol, z_ncol); // b_computed = A*x_overlap
+   ierr = ComputeSPMV(A, x_ncol, z_ncol, mo); // b_computed = A*x_overlap
    if (ierr) HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
-   if ((ierr = ComputeResidual(A.localNumberOfRows, b, z_ncol, residual)))
+   if ((ierr = ComputeResidual(A.localNumberOfRows, b, z_ncol, residual, mo)))
      HPCG_fout << "Error in call to compute_residual: " << ierr << ".\n" << endl;
    if (A.geom->rank==0) HPCG_fout << "SpMV call [" << i << "] Residual [" << residual << "]" << endl;
  }
