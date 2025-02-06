@@ -103,112 +103,101 @@ foreach(target ${AMDGPU_TARGETS})
   list(APPEND HIP_HIPCC_FLAGS "--offload-arch=${target}")
 endforeach()
 
-# Target executable
-if(BUILD_TEST)
-  hip_add_executable(rochpcg ${rochpcg_source} rochpcg_gtest_main.cpp test_rochpcg.cpp ${rochpcg_hip_source})
-else()
-  hip_add_executable(rochpcg ${rochpcg_source} main.cpp ${rochpcg_hip_source})
-endif()
+hip_add_library(rochpcgl ${rochpcg_source} ${rochpcg_hip_source})
 
-target_compile_options(rochpcg PRIVATE ${CMAKE_HOST_FLAGS})
+target_compile_options(rochpcgl PRIVATE ${CMAKE_HOST_FLAGS})
 
 # Support only for contiguous arrays
-target_compile_definitions(rochpcg PRIVATE HPCG_CONTIGUOUS_ARRAYS)
+target_compile_definitions(rochpcgl PUBLIC HPCG_CONTIGUOUS_ARRAYS)
 
 if(HPCG_DEBUG)
-  target_compile_definitions(rochpcg PRIVATE HPCG_DEBUG)
+    target_compile_definitions(rochpcgl PUBLIC HPCG_DEBUG)
 endif()
 
 if(HPCG_DETAILED_DEBUG)
-  target_compile_definitions(rochpcg PRIVATE HPCG_DETAILED_DEBUG)
+    target_compile_definitions(rochpcgl PUBLIC HPCG_DETAILED_DEBUG)
 endif()
 
 if(HPCG_DETAILED_TIMING)
-  target_compile_definitions(rochpcg PRIVATE HPCG_DETAILED_TIMING)
+    target_compile_definitions(rochpcgl PUBLIC HPCG_DETAILED_TIMING)
 endif()
 
 if(HPCG_REFERENCE)
-  target_compile_definitions(rochpcg PRIVATE HPCG_REFERENCE)
-endif()
-
-if(BUILD_TEST)
-  target_compile_definitions(rochpcg PRIVATE GOOGLE_TEST)
+    target_compile_definitions(rochpcgl PUBLIC HPCG_REFERENCE)
 endif()
 
 # Optimization definitions
 if(OPT_MEMMGMT)
-  target_compile_definitions(rochpcg PRIVATE HPCG_MEMMGMT)
+    target_compile_definitions(rochpcgl PUBLIC HPCG_MEMMGMT)
 endif()
 if(OPT_DEFRAG)
-  target_compile_definitions(rochpcg PRIVATE DEFRAG_OPT)
+    target_compile_definitions(rochpcgl PUBLIC DEFRAG_OPT)
 endif()
 if(GPU_AWARE_MPI)
-  target_compile_definitions(rochpcg PRIVATE GPU_AWARE_MPI)
+    target_compile_definitions(rochpcgl PUBLIC GPU_AWARE_MPI)
 endif()
 if(HPCG_TRACING_ENABLED)
   message(STATUS "Enabling tracing-related code.")
-  target_compile_definitions(rochpcg PRIVATE HPCG_TRACING_ENABLED)
+  target_compile_definitions(rochpcgl PUBLIC HPCG_TRACING_ENABLED)
 endif()
 
 # Target include directories
-target_include_directories(rochpcg
-                             PRIVATE
+target_include_directories(rochpcgl
+    PUBLIC
                                $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
                                $<BUILD_INTERFACE:${HIP_INCLUDE_DIRS}>
                                $<BUILD_INTERFACE:${HPCG_MPI_DIR}/include>
                            )
 
 # HIP
-target_link_libraries(rochpcg PRIVATE hip::host)
+target_link_libraries(rochpcgl PUBLIC hip::host)
 
 # Roctx
 if(OPT_ROCTX)
-  target_compile_definitions(rochpcg PRIVATE OPT_ROCTX)
-  #target_link_libraries(rochpcg PRIVATE "${ROCM_PATH}/lib/libroctx64.so")
-  target_include_directories(rochpcg PRIVATE $<BUILD_INTERFACE:${ROCM_PATH}/include/roctracer>)
-  target_link_libraries(rochpcg PRIVATE roc::roctracer)
-  target_link_libraries(rochpcg PRIVATE roc::roctx)
+    target_compile_definitions(rochpcgl PUBLIC OPT_ROCTX)
+    #target_link_libraries(rochpcg PRIVATE "${ROCM_PATH}/lib/libroctx64.so")
+    target_include_directories(rochpcgl PUBLIC $<BUILD_INTERFACE:${ROCM_PATH}/include/roctracer>)
+    target_link_libraries(rochpcgl PUBLIC roc::roctracer)
+    target_link_libraries(rochpcgl PUBLIC roc::roctx)
 endif()
 
 # MPI
 if(HPCG_MPI)
-  target_link_libraries(rochpcg PRIVATE MPI::MPI_CXX libnuma::libnuma)
+    target_link_libraries(rochpcgl PUBLIC MPI::MPI_CXX libnuma::libnuma)
   if(GPU_AWARE_MPI)
-      target_link_libraries(rochpcg PRIVATE ${GTL_LIB})
+      target_link_libraries(rochpcgl PUBLIC ${GTL_LIB})
   endif()
 else()
-  target_compile_definitions(rochpcg PRIVATE HPCG_NO_MPI)
+    target_compile_definitions(rochpcgl PUBLIC HPCG_NO_MPI)
 endif()
 
 # OpenMP
 if(HPCG_OPENMP)
-  target_link_libraries(rochpcg PRIVATE OpenMP::OpenMP_CXX)
+  target_link_libraries(rochpcgl PRIVATE OpenMP::OpenMP_CXX)
 else()
-  target_compile_definitions(rochpcg PRIVATE HPCG_NO_OPENMP)
+  target_compile_definitions(rochpcgl PRIVATE HPCG_NO_OPENMP)
 endif()
 
 # Target link libraries
-target_link_libraries(rochpcg PRIVATE roc::rocprim)
-
-if(BUILD_TEST)
-  target_link_libraries(rochpcg PRIVATE GTest::GTest)
-endif()
+target_link_libraries(rochpcgl PRIVATE roc::rocprim)
 
 
+hip_add_executable(rochpcg main.cpp)
+target_link_libraries(rochpcg rochpcgl)
 
 
 # Target properties
 set_target_properties(rochpcg PROPERTIES VERSION ${rochpcg_VERSION})
 set_property(TARGET rochpcg PROPERTY HIP_ARCHITECTURES ${AMDGPU_TARGETS})
-if(BUILD_TEST)
-  set_target_properties(rochpcg PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
-  set_target_properties(rochpcg PROPERTIES OUTPUT_NAME "rochpcg-test")
-  rocm_package_setup_component(clients)
-  rocm_package_setup_client_component(tests)
-  rocm_install(TARGETS rochpcg COMPONENT tests)
-else()
-  set_target_properties(rochpcg PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-endif()
+#if(BUILD_TEST)
+#  set_target_properties(rochpcg PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
+#  set_target_properties(rochpcg PROPERTIES OUTPUT_NAME "rochpcg-test")
+#  rocm_package_setup_component(clients)
+#  rocm_package_setup_client_component(tests)
+#  rocm_install(TARGETS rochpcg COMPONENT tests)
+#else()
+set_target_properties(rochpcg PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+#endif()
 set_target_properties(rochpcg PROPERTIES DEBUG_POSTFIX "-d")
 
 set(ROCHPCG_BIN "${CMAKE_INSTALL_PREFIX}/bin/rochpcg-${PROJECT_VERSION}")

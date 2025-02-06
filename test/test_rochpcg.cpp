@@ -316,11 +316,13 @@ TEST_P(parameterized_rochpcg, rochpcg)
 
   std::vector< double > opt_times(10,0.0);
 
+  const MonitorOpts mo{false, false};
+
   // Compute the residual reduction and residual count for the user ordering and optimized kernels.
   for (int i=0; i< numberOfCalls; ++i) {
     HIPZeroVector(x); // start x at all zeros
     double last_cummulative_time = opt_times[0];
-    EXPECT_EQ(CG( A, data, b, x, optMaxIters, refTolerance, niters, normr, normr0, &opt_times[0], true, false), false);
+    EXPECT_EQ(CG( A, data, b, x, optMaxIters, refTolerance, mo, niters, normr, normr0, &opt_times[0], true), false);
     EXPECT_LE(normr / normr0, refTolerance);
     check_niter(size, dim.data(), niters);
 
@@ -363,7 +365,7 @@ TEST_P(parameterized_rochpcg, rochpcg)
 
   for (int i=0; i< numberOfCgSets; ++i) {
     HIPZeroVector(x); // Zero out x
-    EXPECT_EQ(CG( A, data, b, x, optMaxIters, optTolerance, niters, normr, normr0, &times[0], true, false), false);
+    EXPECT_EQ(CG( A, data, b, x, optMaxIters, optTolerance, mo, niters, normr, normr0, &times[0], true), false);
     check_niter(size, dim.data(), niters);
 
     testnorms_data.values[i] = normr / normr0; // Record scaled residual from this run

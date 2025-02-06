@@ -106,3 +106,7 @@ rocm_setup_version(VERSION 0.8.5)
 # rocHPCG source directory
 add_subdirectory(src)
 
+if(BUILD_TEST)
+    add_subdirectory(test)
+endif()
+

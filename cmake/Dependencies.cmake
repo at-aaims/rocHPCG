@@ -61,6 +61,7 @@ endif()
 
 # gtest
 if(BUILD_TEST)
+  enable_testing()
   find_package(GTest REQUIRED)
 endif()
 
