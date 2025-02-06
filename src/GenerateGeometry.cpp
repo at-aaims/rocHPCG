@@ -21,16 +21,67 @@
 #include <cmath>
 #include <cstdlib>
 #include <cassert>
+#include <fstream>
+#include <iostream>
+#include <algorithm>
+
+#include <mpi.h>
 
 #include "ComputeOptimalShapeXYZ.hpp"
 #include "GenerateGeometry.hpp"
 
 #ifdef HPCG_DEBUG
-#include <fstream>
 #include "hpcg.hpp"
 using std::endl;
-
 #endif
+
+inline
+std::array<int, 3> get_3d_from_linear_zyx(const std::array<int, 3>& sizes, const int linear_idx)
+{
+    std::array<int,3> idx;
+    idx[0] = linear_idx / (sizes[1]*sizes[2]); //< z id
+    idx[1] = (linear_idx - idx[0]*sizes[1]*sizes[2]) / sizes[2]; //< y id
+    idx[2] = linear_idx - idx[0]*sizes[1]*sizes[2] - idx[1]*sizes[0];
+    return idx;
+}
+
+/*!
+ * Assuming a block distribution of ranks across nodes (consecutive ranks fill one node first),
+ * this function computes global 3D indices of processes such that
+ * a spatially cubical local grid of processes resides on each node rather than a 1D pencil,
+ * so as to reduce off-node neighbourhood comms.
+ *
+ * @param globalrank  Calling process' global rank.
+ * @param np  No. of ranks in each spatial dimension (npz, npy, npx)
+ * @param npernode  Number of ranks desired per node.
+ * @return  This process' global indices in each spatial dimension.
+ */
+std::array<int,3> getProcIDsNodeLocalCubeGrid(const int globalrank, const std::array<int,3> np,
+                                              const int npernode)
+{
+    std::array<int,3> locranks;
+    if (npernode == 8) {
+        std::fill(locranks.begin(), locranks.end(), 2);
+    } else {
+        int lpx, lpy, lpz;
+        ComputeOptimalShapeXYZ(npernode, lpx, lpy, lpz);
+        locranks = std::array<int,3>{lpz, lpy, lpx};
+    }
+    const int globalnode = globalrank / npernode;
+    std::array<int,3> nnodes;
+    for(int i = 0; i < 3; i++) {
+        nnodes[i] = (np[i] - 1) / locranks[i] + 1;
+    }
+    const int localrank = globalrank % npernode;
+    const std::array<int,3> node_idx = get_3d_from_linear_zyx(nnodes, globalnode);
+    const std::array<int,3> local_idx = get_3d_from_linear_zyx(locranks, localrank);
+
+    std::array<int,3> gl_pidx;
+    for(int i = 0; i < 3; i++) {
+        gl_pidx[i] = node_idx[i]*locranks[i] + local_idx[i];
+    }
+    return gl_pidx;
+}
 
 /*!
   Computes the factorization of the total number of processes into a
@@ -83,9 +134,22 @@ void GenerateGeometry(int size, int rank, int numThreads,
   }
 
   // Now compute this process's indices in the 3D cube
-  int ipz = rank/(npx*npy);
-  int ipy = (rank-ipz*npx*npy)/npx;
-  int ipx = rank%npx;
+  //int ipz = rank/(npx*npy);
+  //int ipy = (rank-ipz*npx*npy)/npx;
+  //int ipx = rank%npx;
+
+  MPI_Comm localcomm;
+  MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, &localcomm);
+  int localsize;
+  MPI_Comm_size(localcomm, &localsize);
+  MPI_Comm_free(&localcomm);
+  const auto ip = getProcIDsNodeLocalCubeGrid(rank, {npz, npy, npx}, localsize);
+
+  if(rank == 7) {
+      std::cout << "GenerateGeometry: Rank 7: Local size = " << localsize << std::endl;
+      std::cout << "GenerateGeometry: Rank 7: ipz = " << ip[0] << ", ipy = " << ip[1] << ", ipx = "
+        << ip[2] << std::endl;
+  }
 
 #ifdef HPCG_DEBUG
   if (rank==0)
@@ -98,9 +162,9 @@ void GenerateGeometry(int size, int rank, int numThreads,
         << "npz = " << npz << endl;
 
   HPCG_fout    << "For rank = " << rank << endl
-      << "ipx = " << ipx << endl
-      << "ipy = " << ipy << endl
-      << "ipz = " << ipz << endl;
+      << "ipx = " << ip[2] << endl
+      << "ipy = " << ip[1] << endl
+      << "ipz = " << ip[0] << endl;
 
   assert(size>=npx*npy*npz);
 #endif
@@ -117,9 +181,9 @@ void GenerateGeometry(int size, int rank, int numThreads,
   geom->npartz = npartz;
   geom->partz_ids = partz_ids;
   geom->partz_nz = partz_nz;
-  geom->ipx = ipx;
-  geom->ipy = ipy;
-  geom->ipz = ipz;
+  geom->ipx = ip[2];
+  geom->ipy = ip[1];
+  geom->ipz = ip[0];
 
 // These values should be defined to take into account changes in nx, ny, nz values
 // due to variable local grid sizes
@@ -145,8 +209,8 @@ void GenerateGeometry(int size, int rank, int numThreads,
   ipartz_ids = 0;
   for (int i=0; i< npartz; ++i) {
     int ipart_nz = partz_nz[i];
-    if (ipz < partz_ids[i]) {
-      giz0 += (ipz-ipartz_ids)*ipart_nz;
+    if (ip[0] < partz_ids[i]) {
+      giz0 += (ip[0]-ipartz_ids)*ipart_nz;
       break;
     } else {
       ipartz_ids = partz_ids[i];
@@ -154,8 +218,8 @@ void GenerateGeometry(int size, int rank, int numThreads,
     }
 
   }
-  global_int_t gix0 = ipx*nx;
-  global_int_t giy0 = ipy*ny;
+  global_int_t gix0 = ip[2]*nx;
+  global_int_t giy0 = ip[1]*ny;
 
 // Keep these values for later
   geom->gnx = gnx;
