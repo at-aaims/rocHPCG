@@ -29,59 +29,12 @@
 
 #include "ComputeOptimalShapeXYZ.hpp"
 #include "GenerateGeometry.hpp"
+#include "process_grid.hpp"
 
 #ifdef HPCG_DEBUG
 #include "hpcg.hpp"
 using std::endl;
 #endif
-
-inline
-std::array<int, 3> get_3d_from_linear_zyx(const std::array<int, 3>& sizes, const int linear_idx)
-{
-    std::array<int,3> idx;
-    idx[0] = linear_idx / (sizes[1]*sizes[2]); //< z id
-    idx[1] = (linear_idx - idx[0]*sizes[1]*sizes[2]) / sizes[2]; //< y id
-    idx[2] = linear_idx - idx[0]*sizes[1]*sizes[2] - idx[1]*sizes[0];
-    return idx;
-}
-
-/*!
- * Assuming a block distribution of ranks across nodes (consecutive ranks fill one node first),
- * this function computes global 3D indices of processes such that
- * a spatially cubical local grid of processes resides on each node rather than a 1D pencil,
- * so as to reduce off-node neighbourhood comms.
- *
- * @param globalrank  Calling process' global rank.
- * @param np  No. of ranks in each spatial dimension (npz, npy, npx)
- * @param npernode  Number of ranks desired per node.
- * @return  This process' global indices in each spatial dimension.
- */
-std::array<int,3> getProcIDsNodeLocalCubeGrid(const int globalrank, const std::array<int,3> np,
-                                              const int npernode)
-{
-    std::array<int,3> locranks;
-    if (npernode == 8) {
-        std::fill(locranks.begin(), locranks.end(), 2);
-    } else {
-        int lpx, lpy, lpz;
-        ComputeOptimalShapeXYZ(npernode, lpx, lpy, lpz);
-        locranks = std::array<int,3>{lpz, lpy, lpx};
-    }
-    const int globalnode = globalrank / npernode;
-    std::array<int,3> nnodes;
-    for(int i = 0; i < 3; i++) {
-        nnodes[i] = (np[i] - 1) / locranks[i] + 1;
-    }
-    const int localrank = globalrank % npernode;
-    const std::array<int,3> node_idx = get_3d_from_linear_zyx(nnodes, globalnode);
-    const std::array<int,3> local_idx = get_3d_from_linear_zyx(locranks, localrank);
-
-    std::array<int,3> gl_pidx;
-    for(int i = 0; i < 3; i++) {
-        gl_pidx[i] = node_idx[i]*locranks[i] + local_idx[i];
-    }
-    return gl_pidx;
-}
 
 /*!
   Computes the factorization of the total number of processes into a
@@ -143,13 +96,8 @@ void GenerateGeometry(int size, int rank, int numThreads,
   int localsize;
   MPI_Comm_size(localcomm, &localsize);
   MPI_Comm_free(&localcomm);
-  const auto ip = getProcIDsNodeLocalCubeGrid(rank, {npz, npy, npx}, localsize);
-
-  if(rank == 7) {
-      std::cout << "GenerateGeometry: Rank 7: Local size = " << localsize << std::endl;
-      std::cout << "GenerateGeometry: Rank 7: ipz = " << ip[0] << ", ipy = " << ip[1] << ", ipx = "
-        << ip[2] << std::endl;
-  }
+  ProcGridLocalCube pg({npz, npy, npx}, localsize);
+  const auto ip = pg.getProcCoords(rank);
 
 #ifdef HPCG_DEBUG
   if (rank==0)
@@ -184,6 +132,7 @@ void GenerateGeometry(int size, int rank, int numThreads,
   geom->ipx = ip[2];
   geom->ipy = ip[1];
   geom->ipz = ip[0];
+  geom->ranks_per_node = localsize;
 
 // These values should be defined to take into account changes in nx, ny, nz values
 // due to variable local grid sizes

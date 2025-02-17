@@ -45,6 +45,7 @@
 
  HPCG routine
  */
+#include <array>
 
 #ifndef HPCG_NO_MPI
 #include <mpi.h>
@@ -56,6 +57,7 @@
 
 #include "utils.hpp"
 #include "SetupHalo.hpp"
+#include "process_grid.hpp"
 
 #define LAUNCH_COPY_INDICES(blocksizex, blocksizey)                       \
     {                                                                     \
@@ -75,6 +77,7 @@
         dim3 threads(blocksizex, blocksizey);                           \
                                                                         \
         kernel_setup_halo<blocksizex, blocksizey><<<blocks, threads>>>( \
+            proc_grid,                                                  \
             A.localNumberOfRows,                                        \
             max_boundary,                                               \
             max_sending,                                                \
@@ -85,9 +88,6 @@
             (nx & (nx - 1)),                                            \
             (ny & (ny - 1)),                                            \
             (nz & (nz - 1)),                                            \
-            A.geom->npx,                                                \
-            A.geom->npy,                                                \
-            A.geom->npz,                                                \
             A.geom->gnx,                                                \
             A.geom->gnx * A.geom->gny,                                  \
             A.geom->gix0 / nx,                                          \
@@ -132,7 +132,8 @@ __global__ void kernel_copy_indices(local_int_t size,
 
 template <unsigned int BLOCKSIZEX, unsigned int BLOCKSIZEY>
 __launch_bounds__(BLOCKSIZEX * BLOCKSIZEY)
-__global__ void kernel_setup_halo(local_int_t m,
+__global__ void kernel_setup_halo(const ProcGridLocalCube pg,
+                                  local_int_t m,
                                   local_int_t max_boundary,
                                   local_int_t max_sending,
                                   local_int_t max_neighbors,
@@ -142,9 +143,9 @@ __global__ void kernel_setup_halo(local_int_t m,
                                   bool xp2,
                                   bool yp2,
                                   bool zp2,
-                                  local_int_t npx,
-                                  local_int_t npy,
-                                  local_int_t npz,
+                                  //local_int_t npx,
+                                  //local_int_t npy,
+                                  //local_int_t npz,
                                   global_int_t gnx,
                                   global_int_t gnxgny,
                                   global_int_t ipx0,
@@ -161,6 +162,7 @@ __global__ void kernel_setup_halo(local_int_t m,
                                   local_int_t* __restrict__ halo_indices)
 {
     // Each block processes blockDim.y rows
+    // Each y-thread processes 1 row
     local_int_t currentLocalRow = blockIdx.x * BLOCKSIZEY + threadIdx.y;
 
     // Some shared memory to mark rows that need to be sent to neighboring processes
@@ -176,6 +178,7 @@ __global__ void kernel_setup_halo(local_int_t m,
     }
 
     // Global ID for 1D grid of 2D blocks
+    // Each x-thread processes 1 nonzero within the row
     local_int_t gid = currentLocalRow * BLOCKSIZEX + threadIdx.x;
 
     // Process only non-zeros of current row ; each thread index in x direction processes one column entry
@@ -184,34 +187,46 @@ __global__ void kernel_setup_halo(local_int_t m,
         // Obtain the corresponding global column index (generated in GenerateProblem.cpp)
         global_int_t currentGlobalColumn = mtxIndG[gid];
 
-        // Determine neighboring process of current global column
+        // Determine 3D global indices of current global column
         global_int_t iz = currentGlobalColumn / gnxgny;
         global_int_t iy = (currentGlobalColumn - iz * gnxgny) / gnx;
         global_int_t ix = currentGlobalColumn % gnx;
 
-        local_int_t ipz = iz / nz;
-        local_int_t ipy = iy / ny;
-        local_int_t ipx = ix / nx;
+        const std::array<local_int_t,3> nlocpoin{nz,ny,nz};
+        const std::array<global_int_t,3> pointidx{iz,iy,ix};
+
+        // process of current global column
+        // For boundary row, this is the neighbouring subdomain
+        // for interior row, this is the current subdomain
+        std::array<int,3> ip;
+        for(int i = 0; i < 3; i++) {
+            ip[i] = static_cast<int>(pointidx[i] / nlocpoin[i]);
+        }
+        //local_int_t ipz = iz / nz;
+        //local_int_t ipy = iy / ny;
+        //local_int_t ipx = ix / nx;
 
         // Compute neighboring process id depending on the global column.
         // Each domain has at most 26 neighboring domains.
         // Since the numbering is following a fixed order, we can compute the
         // neighbor process id by the actual x,y,z coordinate of the entry, using
         // the domains offsets into the global numbering.
-        local_int_t neighborRankId = (ipz - ipz0) * 9 + (ipy - ipy0) * 3 + (ipx - ipx0);
-
         // This will give us the neighboring process id between [-13, 13] where 0
         // is the local domain. We shift the resulting id by 13 to avoid negative indices.
-        neighborRankId += 13;
+        const local_int_t neighborRankId = (ip[0] - ipz0) * 9 + (ip[1] - ipy0) * 3 + (ip[2] - ipx0) + 13;
+        //local_int_t neighborRankId = (ipz - ipz0) * 9 + (ipy - ipy0) * 3 + (ipx - ipx0);
 
-        // Check whether we are in the local domain or not
+        //neighborRankId += 13;
+
+        // Check whether we are in the local domain or not; 13 is for local domain.
         if(neighborRankId != 13)
         {
             // Mark current row for sending, to avoid multiple entries with the same row index
             sdata[neighborRankId + threadIdx.y * max_neighbors] = true;
 
             // Also store the "real" process id this global column index belongs to
-            neighbors[neighborRankId] = ipx + ipy * npx + ipz * npy * npx;
+            //neighbors[neighborRankId] = ip[2] + ip[1] * npx + ip[0] * npy * npx;
+            neighbors[neighborRankId] = pg.getRank(ip);
 
             // Count up the global column that we have to receive by a neighbor using atomics
             local_int_t idx = atomicAdd(&nrecv_per_rank[neighborRankId], 1);
@@ -389,6 +404,9 @@ void SetupHalo(SparseMatrix& A)
     // Both arrays hold max_boundary elements per neighboring rank, at max
     HIP_CHECK(deviceMalloc((void**)&d_recv_indices, sizeof(global_int_t) * max_boundary * max_neighbors));
     HIP_CHECK(deviceMalloc((void**)&d_halo_indices, sizeof(local_int_t) * max_boundary * max_neighbors));
+
+    const ProcGridLocalCube proc_grid(std::array<int,3>{A.geom->npz, A.geom->npy, A.geom->npx},
+            A.geom->ranks_per_node);
 
     // SetupHalo kernel
     if     (blocksize == 32) LAUNCH_SETUP_HALO(27, 32)
