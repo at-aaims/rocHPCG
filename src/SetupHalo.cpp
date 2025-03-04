@@ -163,7 +163,7 @@ __global__ void kernel_setup_halo(const ProcGridLocalCube pg,
 {
     // Each block processes blockDim.y rows
     // Each y-thread processes 1 row
-    local_int_t currentLocalRow = blockIdx.x * BLOCKSIZEY + threadIdx.y;
+    const local_int_t currentLocalRow = blockIdx.x * BLOCKSIZEY + threadIdx.y;
 
     // Some shared memory to mark rows that need to be sent to neighboring processes
     __shared__ bool sdata[BLOCKSIZEX * BLOCKSIZEY];
@@ -179,28 +179,28 @@ __global__ void kernel_setup_halo(const ProcGridLocalCube pg,
 
     // Global ID for 1D grid of 2D blocks
     // Each x-thread processes 1 nonzero within the row
-    local_int_t gid = currentLocalRow * BLOCKSIZEX + threadIdx.x;
+    const local_int_t gid = currentLocalRow * BLOCKSIZEX + threadIdx.x;
 
     // Process only non-zeros of current row ; each thread index in x direction processes one column entry
     if(threadIdx.x < nonzerosInRow[currentLocalRow])
     {
         // Obtain the corresponding global column index (generated in GenerateProblem.cpp)
-        global_int_t currentGlobalColumn = mtxIndG[gid];
+        const global_int_t currentGlobalColumn = mtxIndG[gid];
 
         // Determine 3D global indices of current global column
-        global_int_t iz = currentGlobalColumn / gnxgny;
-        global_int_t iy = (currentGlobalColumn - iz * gnxgny) / gnx;
-        global_int_t ix = currentGlobalColumn % gnx;
+        const global_int_t iz = currentGlobalColumn / gnxgny;
+        const global_int_t iy = (currentGlobalColumn - iz * gnxgny) / gnx;
+        const global_int_t ix = currentGlobalColumn % gnx;
 
-        const std::array<local_int_t,3> nlocpoin{nz,ny,nz};
-        const std::array<global_int_t,3> pointidx{iz,iy,ix};
+        const std::array<local_int_t,3> nlocpoin{nz,ny,nx};
+        const std::array<global_int_t,3> pointidx_g{iz,iy,ix};
 
         // process of current global column
         // For boundary row, this is the neighbouring subdomain
         // for interior row, this is the current subdomain
         std::array<int,3> ip;
         for(int i = 0; i < 3; i++) {
-            ip[i] = static_cast<int>(pointidx[i] / nlocpoin[i]);
+            ip[i] = static_cast<int>(pointidx_g[i] / nlocpoin[i]);
         }
         //local_int_t ipz = iz / nz;
         //local_int_t ipy = iy / ny;
@@ -373,7 +373,7 @@ void SetupHalo(SparseMatrix& A)
     local_int_t max_boundary = 9 * max_dim_1 * max_dim_2;
 
     // A maximum of 27 neighbors, including outselves, is possible for each process
-    int max_neighbors = 27;
+    const int max_neighbors = 27;
 
     // Arrays to hold send and receive element offsets per rank
     local_int_t* d_nsend_per_rank;
@@ -547,11 +547,12 @@ void SetupHalo(SparseMatrix& A)
                         hipMemcpyDeviceToHost));
     HIP_CHECK(deviceFree(d_neighbors));
 
+
     // Loop over all possible neighbors
     for(int i = 0; i < max_neighbors; ++i)
     {
         // Number of entries that have to be received from i-th rank
-        local_int_t entriesToRecv = nrecv_per_rank[i + 1] - nrecv_per_rank[i];
+        const local_int_t entriesToRecv = nrecv_per_rank[i + 1] - nrecv_per_rank[i];
 
         // Check if we actually receive data
         if(entriesToRecv == 0)

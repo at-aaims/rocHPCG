@@ -2,15 +2,15 @@
 #include <cmath>
 #include <cstdlib>
 
-#ifdef HPCG_CUBIC_RADICAL_SEARCH
-#include <algorithm>
-#endif
 #include <map>
 
 #include "ComputeOptimalShapeXYZ.hpp"
 #include "MixedBaseCounter.hpp"
 
 #ifdef HPCG_CUBIC_RADICAL_SEARCH
+
+#include <algorithm>
+
 static int
 min3(int a, int b, int c) {
   return std::min(a, std::min(b, c));

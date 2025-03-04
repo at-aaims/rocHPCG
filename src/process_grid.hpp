@@ -43,6 +43,10 @@ public:
     { }
 
     /// Get the 3D process coordinates of a given rank
+    /** FIXME: nprocs_[i] may not be a multiple of loc_ranks_[i] even on a known system.
+     * In this case, once of the "nodes" has less than the regular number of subdomains.
+     * The current assumes extra subdomains to fill out all incomplete nodes.
+     */
     __host__ __device__
     std::array<int,3> getProcCoords(const int globalrank) const
     {
@@ -79,9 +83,9 @@ public:
     }
 
 private:
-    std::array<int,3> nprocs_;    ///< Total number of processes in the 3 coordinate directions
-    int ranks_per_node_;          ///< Number of processes per node
-    std::array<int,3> loc_ranks_; ///< Number of ranks per node in each direction
+    const std::array<int,3> nprocs_;    ///< Total number of processes in the 3 coordinate directions
+    const int ranks_per_node_;          ///< Number of processes per node
+    const std::array<int,3> loc_ranks_; ///< Number of ranks per node in each direction
 
     __host__ __device__
     std::array<int,3> get_local_procgrid_size() const

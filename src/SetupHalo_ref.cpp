@@ -18,6 +18,8 @@
  HPCG routine
  */
 
+#include <stdexcept>
+
 #ifndef HPCG_NO_MPI
 #include <mpi.h>
 #include <map>
@@ -47,6 +49,8 @@ using std::endl;
   @see ExchangeHalo
 */
 void SetupHalo_ref(SparseMatrix & A) {
+
+  throw std::runtime_error("Called unsupported function!");
 
   // Extract Matrix pieces
 

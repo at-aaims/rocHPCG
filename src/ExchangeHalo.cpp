@@ -89,7 +89,7 @@ void ExchangeHalo(const SparseMatrix & A, Vector & x) {
   //  wait call below.
   //
 
-  int MPI_MY_TAG = 99;
+  int MPI_MY_TAG = 98;
 
   MPI_Request * request = new MPI_Request[num_neighbors];
 
