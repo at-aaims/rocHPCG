@@ -1,3 +1,9 @@
+/**
+ * @file process_grid.hpp
+ * @author Aditya Kashi
+ * @copyright (C) 2025, Oak Ridge National Laboratory, Oak Ridge, TN 37830, USA.
+ */
+
 #ifndef ROCHPCG_PROCESS_GRID_H
 #define ROCHPCG_PROCESS_GRID_H
 
